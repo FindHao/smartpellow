@@ -15,10 +15,19 @@
  */
 package small.find;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.achartengine.ChartFactory;
 import org.achartengine.GraphicalView;
 import org.achartengine.chart.PointStyle;
+
 import small.find.R;
+
 import org.achartengine.model.SeriesSelection;
 import org.achartengine.model.XYMultipleSeriesDataset;
 import org.achartengine.model.XYSeries;
@@ -26,8 +35,16 @@ import org.achartengine.renderer.XYMultipleSeriesRenderer;
 import org.achartengine.renderer.XYSeriesRenderer;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
@@ -54,6 +71,33 @@ public class SmartPellow extends Activity {
   private EditText mY;
   /** The chart view that displays the data. */
   private GraphicalView mChartView;
+  
+  
+  
+  
+  
+  private BluetoothAdapter btAdapter;
+	private BluetoothDevice btDevice;
+	private BluetoothSocket btSocket;
+	static OutputStream outputStream;
+	static InputStream input;
+	private BroadcastReceiver mReceiver;
+	
+	private static final UUID MY_UUID=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+//			("00001101-0000-1000-8000-98D331B3A53B");
+	//要配对的地址
+	String address="";
+	private BroadcastReceiver btConnectReceiver;
+	private BroadcastReceiver btDisconnectReceiver;
+	private IntentFilter connectIntentFilter;
+	private IntentFilter disconnectIntentFilter;
+	private boolean isConnect = false;
+	//只配对一个
+	List<BluetoothDevice>devices;
+	private static final String TAG = "ProcessInfo";
+  
+  
+  
   
   
   int[] colors = new int[] { Color.BLUE, Color.GREEN, Color.CYAN };
@@ -110,7 +154,7 @@ public class SmartPellow extends Activity {
     mRenderer.setXAxisMin(0);
     mRenderer.setYAxisMin(0); 
     mRenderer.setYAxisMax(40);
-    mRenderer.setPanLimits(new double[]{0,10,0,40});
+    mRenderer.setPanLimits(new double[]{0,600,0,40});
     
     // the button that handles the new series of data creation
     mNewSeries = (Button) findViewById(R.id.new_series);
@@ -202,8 +246,131 @@ public class SmartPellow extends Activity {
         mChartView.repaint();
       }
     });
-  }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    btAdapter=BluetoothAdapter.getDefaultAdapter();
+	
+	devices=new ArrayList<BluetoothDevice>(btAdapter.getBondedDevices());
+//	if(devices.size()>0){
+//		
+//		connect(devices.get(0).getAddress());
+//		
+//	}else{
+		Toast.makeText(SmartPellow.this, "还没有配对", Toast.LENGTH_SHORT).show();
+		mReceiver=new BroadcastReceiver() {
+			
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				String action=intent.getAction();
+				if(BluetoothDevice.ACTION_FOUND.equals(action)){
+					BluetoothDevice device=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+					Toast.makeText(SmartPellow.this, device.getName(), Toast.LENGTH_SHORT).show();
+					Log.i(TAG, device.getName()+device.getAddress());
+					connect(device.getAddress());
+				}
+			}
+		};
+		IntentFilter intentFilter=new IntentFilter(BluetoothDevice.ACTION_FOUND);
+		registerReceiver(mReceiver, intentFilter);
+		
+		btConnectReceiver=new BroadcastReceiver() {
+			
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				Log.e(TAG, "--connected");
+				isConnect=true;
+				
+				
+				
+			}
+		};
+		connectIntentFilter=new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
+		registerReceiver(btConnectReceiver, connectIntentFilter);
+		
+		btDisconnectReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context arg0, Intent arg1) {
+				// TODO Auto-generated method stub
+				Log.e(TAG, "-- disconnected");
+				isConnect = false;
+				new TryToConnet().start();
+			}
+		};
 
+		disconnectIntentFilter = new IntentFilter(
+				BluetoothDevice.ACTION_ACL_DISCONNECTED);
+		registerReceiver(btDisconnectReceiver, disconnectIntentFilter);
+		btAdapter.startDiscovery();
+		
+//	}
+    
+    
+    
+  }
+  private class TryToConnet extends Thread {
+		public void run() {
+			/* 此处必须重新创建一个socket，否则重新连接后无法传输数据，个人猜想是Rfcomm通道已经改变 */
+			try {
+				btSocket = btDevice.createRfcommSocketToServiceRecord(MY_UUID);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				Log.e(TAG, "-- failed to create btSocket");
+			}
+			try {
+				outputStream = btSocket.getOutputStream();
+				input=btSocket.getInputStream();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			while (true) {
+				try {
+					btSocket.connect();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if (isConnect) {
+					Log.e(TAG, "-- Connect again,ending the TryToConnet thread");
+					break;
+				}
+			}
+		}
+	}
+  
+  
+  
+  public void connect(String address){
+		btAdapter.cancelDiscovery();
+		btDevice=btAdapter.getRemoteDevice(address);
+		
+		try {
+			btSocket=btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+			outputStream =btSocket.getOutputStream();
+			btSocket.connect();
+			Toast.makeText(SmartPellow.this, "连接成功", Toast.LENGTH_LONG).show();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			Toast.makeText(SmartPellow.this, "连接失败", Toast.LENGTH_LONG).show();
+			e.printStackTrace();
+		}
+	}
+  
+  
+  
+  
+  
+  
+  
   @Override
   protected void onResume() {
     super.onResume();
