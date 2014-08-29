@@ -21,6 +21,8 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.achartengine.ChartFactory;
 import org.achartengine.GraphicalView;
@@ -34,8 +36,9 @@ import org.achartengine.model.XYSeries;
 import org.achartengine.renderer.XYMultipleSeriesRenderer;
 import org.achartengine.renderer.XYSeriesRenderer;
 
-import android.R.string;
+
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -47,9 +50,9 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -59,24 +62,24 @@ public class SmartPellow extends Activity {
   /** The main renderer that includes all the renderers customizing a chart. */
   private XYMultipleSeriesRenderer mRenderer = new XYMultipleSeriesRenderer();
   /** The most recently added series. */
-  private XYSeries mCurrentSeries;
+  private XYSeries mTemperature;
+  private XYSeries mSound;
+  private XYSeries mPressure;
   /** The most recently created renderer, customizing the current series. */
   private XYSeriesRenderer mCurrentRenderer;
+  private XYSeriesRenderer mCurrentRenderer2;
+  private XYSeriesRenderer mCurrentRenderer3;
   /** Button for creating a new series of data. */
   private Button mNewSeries;
   /** Button for adding entered data to the current series. */
-  private Button mAdd;
-  /** Edit text field for entering the X value of the data to be added. */
-  private EditText mX;
-  /** Edit text field for entering the Y value of the data to be added. */
-  private EditText mY;
   /** The chart view that displays the data. */
   private GraphicalView mChartView;
-  
-  
-  
-  
-  
+  //声音次数
+  int numdata=0;
+  //时间
+  int time=0;
+  private Button notice;
+  boolean showed=false;
   private BluetoothAdapter btAdapter;
 	private BluetoothDevice btDevice;
 	private BluetoothSocket btSocket;
@@ -97,10 +100,27 @@ public class SmartPellow extends Activity {
 	List<BluetoothDevice>devices;
 	private static final String TAG = "ProcessInfo";
   
+	final String HAVEHULU="您打呼噜哦";
+	final String HAVEHULUHEAVY="您打呼噜比较严重哦";
+	final String FANGUN="您睡觉容易翻身哦，睡眠深度不足";
+	final String DIWEN="温度较低，请注意头部保暖哦";
+	//呼噜&&翻身
+	final String SLEEPSTATE1="较差";
+	//呼噜||翻身
+	final String SLEEPSTATE2="一般";
+	//none
+	final String SLEEPSTATE3="良好";
   
-  
-  
-  
+	String showNotice;
+	boolean hulu=false;
+	boolean huluheavy=false;
+	boolean fanshen=false;
+	double temperaver=0;
+	double yalicha=0;
+	boolean first=false;
+	double preyali=0;
+	
+	
   int[] colors = new int[] { Color.BLUE, Color.GREEN, Color.CYAN };
   String[] titles = new String[] { "温度", "压力", "声音" };
   PointStyle[] styles = new PointStyle[] { PointStyle.CIRCLE, PointStyle.DIAMOND,  
@@ -112,8 +132,12 @@ public class SmartPellow extends Activity {
     // save the current data, for instance when changing screen orientation
     outState.putSerializable("dataset", mDataset);
     outState.putSerializable("renderer", mRenderer);
-    outState.putSerializable("current_series", mCurrentSeries);
+    outState.putSerializable("current_series", mTemperature);
+    outState.putSerializable("current_series2", mSound);
+    outState.putSerializable("current_series3", mPressure);
     outState.putSerializable("current_renderer", mCurrentRenderer);
+    outState.putSerializable("current_renderer2", mCurrentRenderer2);
+    outState.putSerializable("current_renderer3", mCurrentRenderer3);
   }
 
   @Override
@@ -123,21 +147,18 @@ public class SmartPellow extends Activity {
     // orientation
     mDataset = (XYMultipleSeriesDataset) savedState.getSerializable("dataset");
     mRenderer = (XYMultipleSeriesRenderer) savedState.getSerializable("renderer");
-    mCurrentSeries = (XYSeries) savedState.getSerializable("current_series");
+    mTemperature = (XYSeries) savedState.getSerializable("current_series");
+    mSound = (XYSeries) savedState.getSerializable("current_series2");
+    mPressure = (XYSeries) savedState.getSerializable("current_series3");
     mCurrentRenderer = (XYSeriesRenderer) savedState.getSerializable("current_renderer");
+    mCurrentRenderer2 = (XYSeriesRenderer) savedState.getSerializable("current_renderer2");
+    mCurrentRenderer3 = (XYSeriesRenderer) savedState.getSerializable("current_renderer3");
   }
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.xy_chart);
-
-    // the top part of the UI components for adding new data points
-    mX = (EditText) findViewById(R.id.xValue);
-    mY = (EditText) findViewById(R.id.yValue);
-    mAdd = (Button) findViewById(R.id.add);
-
-    
 
     
     // set some properties on the main renderer
@@ -151,11 +172,11 @@ public class SmartPellow extends Activity {
     mRenderer.setZoomButtonsVisible(true);
     mRenderer.setPointSize(5);
 
-    mRenderer.setXAxisMax(600);
+    mRenderer.setXAxisMax(30);
     mRenderer.setXAxisMin(0);
     mRenderer.setYAxisMin(0); 
-    mRenderer.setYAxisMax(40);
-    mRenderer.setPanLimits(new double[]{0,600,0,40});
+    mRenderer.setYAxisMax(35);
+    mRenderer.setPanLimits(new double[]{0,30,0,35});
     
     // the button that handles the new series of data creation
     mNewSeries = (Button) findViewById(R.id.new_series);
@@ -167,86 +188,72 @@ public class SmartPellow extends Activity {
 //        mDataset.addSeries(series);
 //        mCurrentSeries = series;
     	    //添加三组数据
-    	    XYSeries temperature=new XYSeries("温度");
-    	    mDataset.addSeries(temperature);
-        // create a new renderer for the new series
-        XYSeriesRenderer renderer = new XYSeriesRenderer();
-        mRenderer.addSeriesRenderer(renderer);
-        // set some renderer properties
-        renderer.setPointStyle(PointStyle.CIRCLE);
-        renderer.setFillPoints(true);
-        renderer.setDisplayChartValues(true);
-        renderer.setDisplayChartValuesDistance(5);
-        mCurrentRenderer = renderer;
-        setSeriesWidgetsEnabled(true);
-//        mChartView.repaint();
-        
-        
-        XYSeries sound=new XYSeries("声音");
-        mDataset.addSeries(sound);
-        XYSeriesRenderer renderer2 = new XYSeriesRenderer();
-        mRenderer.addSeriesRenderer(renderer2);
-        // set some renderer properties
-        renderer2.setPointStyle(PointStyle.DIAMOND);
-        renderer2.setFillPoints(true);
-        renderer2.setDisplayChartValues(true);
-        renderer2.setDisplayChartValuesDistance(5);
-        mCurrentRenderer = renderer2;
-        setSeriesWidgetsEnabled(true);
-//        mChartView.repaint();
-        
-        
-        XYSeries pressure = new XYSeries("压力");
-        mDataset.addSeries(pressure);
-        XYSeriesRenderer renderer3 = new XYSeriesRenderer();
-        mRenderer.addSeriesRenderer(renderer3);
-        // set some renderer properties
-        renderer3.setPointStyle(PointStyle.TRIANGLE);
-        renderer3.setFillPoints(true);
-        renderer3.setDisplayChartValues(true);
-        renderer3.setDisplayChartValuesDistance(5);
-        mCurrentRenderer = renderer3;
-        setSeriesWidgetsEnabled(true);
-        
-        
-        pressure.add(0, 10);
-        pressure.add(20, 30);
-        temperature.add(0, 20);
-        temperature.add(5, 20);
-        sound.add(2, 20);
-        sound.add(5, 30);
-        mChartView.repaint();
-        
-        
-        
+    	  XYSeries temperature=new XYSeries("温度");
+  	    mDataset.addSeries(temperature);
+    // create a new renderer for the new series
+    XYSeriesRenderer renderer = new XYSeriesRenderer();
+    mRenderer.addSeriesRenderer(renderer);
+    // set some renderer properties
+    renderer.setPointStyle(PointStyle.CIRCLE);
+    renderer.setFillPoints(true);
+    renderer.setDisplayChartValues(true);
+    renderer.setDisplayChartValuesDistance(5);
+    mTemperature = temperature;
+    mCurrentRenderer = renderer;
+//    setSeriesWidgetsEnabled(true);
+  //  mChartView.repaint();
+    
+    XYSeries sound=new XYSeries("声音");
+    mDataset.addSeries(sound);
+    XYSeriesRenderer renderer2 = new XYSeriesRenderer();
+    mRenderer.addSeriesRenderer(renderer2);
+    // set some renderer properties
+    renderer2.setPointStyle(PointStyle.DIAMOND);
+    renderer2.setFillPoints(true);
+    renderer2.setDisplayChartValues(true);
+    renderer2.setDisplayChartValuesDistance(5);
+    mSound=sound;
+    mCurrentRenderer2 = renderer2;
+//    setSeriesWidgetsEnabled(true);
+  //  mChartView.repaint();
+    
+    
+    XYSeries pressure = new XYSeries("压力");
+    pressure = new XYSeries("压力");
+    mDataset.addSeries(pressure);
+    XYSeriesRenderer renderer3 = new XYSeriesRenderer();
+    mRenderer.addSeriesRenderer(renderer3);
+    // set some renderer properties
+    renderer3.setPointStyle(PointStyle.TRIANGLE);
+    renderer3.setFillPoints(true);
+    renderer3.setDisplayChartValues(true);
+    renderer3.setDisplayChartValuesDistance(5);
+    mPressure=pressure;
+    mCurrentRenderer3 = renderer3;
+//    setSeriesWidgetsEnabled(true);
+    
+    
+    pressure.add(0, 0);
+//    pressure.add(20, 30);
+    temperature.add(0, 0);
+//    temperature.add(5, 20);
+    sound.add(0, 0);
+//    sound.add(5, 30);
+    showed=true;
+    mChartView.repaint();
       }
     });
-
-    mAdd.setOnClickListener(new View.OnClickListener() {
-      public void onClick(View v) {
-        double x = 0;
-        double y = 0;
-        try {
-          x = Double.parseDouble(mX.getText().toString());
-        } catch (NumberFormatException e) {
-          mX.requestFocus();
-          return;
-        }
-        try {
-          y = Double.parseDouble(mY.getText().toString());
-        } catch (NumberFormatException e) {
-          mY.requestFocus();
-          return;
-        }
-        // add a new data point to the current series
-        mCurrentSeries.add(x, y);
-        mX.setText("");
-        mY.setText("");
-        mX.requestFocus();
-        // repaint the chart such as the newly added point to be visible
-        mChartView.repaint();
-      }
-    });
+    notice=(Button)findViewById(R.id.notice);
+    notice.setOnClickListener(new OnClickListener() {
+		
+		@Override
+		public void onClick(View v) {
+			judge();
+			new AlertDialog.Builder(SmartPellow.this).setTitle("关于").setMessage(showNotice).setPositiveButton("知道啦", null).show();
+			
+		}
+	});
+    
     
     //蓝牙连接部分
     
@@ -301,24 +308,13 @@ public class SmartPellow extends Activity {
   		
   		 btAdapter.cancelDiscovery();
 			btDevice=btAdapter.getRemoteDevice(address);
-			try {
-				btSocket=btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
-				btSocket.connect();
-				outputStream =btSocket.getOutputStream();
-				inputStream=btSocket.getInputStream();
-				Toast.makeText(SmartPellow.this, "连接成功", Toast.LENGTH_LONG).show();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				Toast.makeText(SmartPellow.this, "连接失败", Toast.LENGTH_LONG).show();
-				e.printStackTrace();
-			}
 			if(devices.size()>0){
 				Toast.makeText(SmartPellow.this, "正在连接",Toast.LENGTH_SHORT).show();
 //				new Connect().start();
 				connect();
 //				
 			}else{
-				Toast.makeText(SmartPellow.this, "还没有配对", Toast.LENGTH_SHORT).show();
+				Toast.makeText(SmartPellow.this, "正在搜索", Toast.LENGTH_SHORT).show();
 				btAdapter.startDiscovery();
 				
 			}
@@ -333,6 +329,90 @@ public class SmartPellow extends Activity {
     
     
   }
+  void judge(){
+	  showNotice="";
+	  if(temperaver<40)showNotice+=DIWEN+";";
+	  if(huluheavy)showNotice+=HAVEHULUHEAVY+";";
+	  else if(hulu)showNotice+=HAVEHULU+";";
+	  if(yalicha>2)showNotice+=FANGUN+";";
+	  if(hulu&&fanshen)showNotice+=SLEEPSTATE1;
+	  else{
+		  if(hulu||fanshen)showNotice+=SLEEPSTATE2;
+		  else showNotice+=SLEEPSTATE3;
+	  }
+  }
+  void adddata(double t,double v,double s){
+	  if(!first){
+		  first=true;
+	  }else{
+		  yalicha=Math.abs(v-preyali);
+	  }
+	  preyali=v;
+	  mSound.add(time, s);
+	  if(s>20)huluheavy=true;
+	  if(s>2)hulu=true;
+	  mPressure.add(time, v);
+	  
+	  
+	  mTemperature.add(time, t);
+	  temperaver=Math.max(temperaver, t);
+	  time++;
+	  mChartView.repaint();
+  }
+  void show(){
+	  XYSeries temperature=new XYSeries("温度");
+	    mDataset.addSeries(temperature);
+  // create a new renderer for the new series
+  XYSeriesRenderer renderer = new XYSeriesRenderer();
+  mRenderer.addSeriesRenderer(renderer);
+  // set some renderer properties
+  renderer.setPointStyle(PointStyle.CIRCLE);
+  renderer.setFillPoints(true);
+  renderer.setDisplayChartValues(true);
+  renderer.setDisplayChartValuesDistance(5);
+  mTemperature = temperature;
+  mCurrentRenderer = renderer;
+//  setSeriesWidgetsEnabled(true);
+//  mChartView.repaint();
+  
+  XYSeries sound=new XYSeries("声音");
+  mDataset.addSeries(sound);
+  XYSeriesRenderer renderer2 = new XYSeriesRenderer();
+  mRenderer.addSeriesRenderer(renderer2);
+  // set some renderer properties
+  renderer2.setPointStyle(PointStyle.DIAMOND);
+  renderer2.setFillPoints(true);
+  renderer2.setDisplayChartValues(true);
+  renderer2.setDisplayChartValuesDistance(5);
+  mCurrentRenderer2 = renderer2;
+//  setSeriesWidgetsEnabled(true);
+//  mChartView.repaint();
+  
+  
+  XYSeries pressure = new XYSeries("压力");
+  pressure = new XYSeries("压力");
+  mDataset.addSeries(pressure);
+  XYSeriesRenderer renderer3 = new XYSeriesRenderer();
+  mRenderer.addSeriesRenderer(renderer3);
+  // set some renderer properties
+  renderer3.setPointStyle(PointStyle.TRIANGLE);
+  renderer3.setFillPoints(true);
+  renderer3.setDisplayChartValues(true);
+  renderer3.setDisplayChartValuesDistance(5);
+  mCurrentRenderer3 = renderer3;
+//  setSeriesWidgetsEnabled(true);
+  
+  
+  pressure.add(0, 10);
+  pressure.add(20, 30);
+  temperature.add(0, 20);
+  temperature.add(5, 20);
+  sound.add(2, 20);
+  sound.add(5, 30);
+  mChartView.repaint();
+  
+  
+  }
   void connect(){
 	  btAdapter.cancelDiscovery();
 		btDevice=btAdapter.getRemoteDevice(address);
@@ -341,29 +421,27 @@ public class SmartPellow extends Activity {
 			btSocket.connect();
 			outputStream =btSocket.getOutputStream();
 			inputStream=btSocket.getInputStream();
+//			show();
 			Toast.makeText(SmartPellow.this, "连接成功", Toast.LENGTH_LONG).show();
-//			new Thread(new ClientMessageReceived()).start();
-//			while(true){
-//				int bytes=inputStream.read();
-//				Log.d(TAG, ""+bytes);
-//			}
-//			while(true){
-//				try {
-//					byte[]buffer=new byte[1024];
-//					inputStream.read(buffer);
-////					for(int i=0;i<100;i++)System.out.println(buffer[i]);
-//					System.out.println(new String(buffer));
-//				} catch (IOException e) {
-//					// TODO Auto-generated catch block
-//					e.printStackTrace();
-//				}
-//			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			Toast.makeText(SmartPellow.this, "连接失败", Toast.LENGTH_LONG).show();
 			e.printStackTrace();
 		}
 		new Thread(new Connect()).start();
+  }
+  
+  public void showData(String aa){
+	  int sindex=aa.indexOf(':');
+	  String v=aa.substring(sindex+1, sindex+6);
+	  sindex+=7;
+	  String num=aa.substring(sindex,sindex+5);
+	  sindex+=5;
+	  String t=aa.substring(sindex,sindex+3);
+	  if(showed){
+		  adddata(Double.parseDouble(t), Double.parseDouble(v), Integer.parseInt(num)/10);
+		  numdata=Integer.parseInt(num);
+	  }
   }
   
   private class Connect implements Runnable{
@@ -379,8 +457,10 @@ public class SmartPellow extends Activity {
 					buffer[i]=str[i][0];
 				}
 				ans+=new String(buffer);
-				if(ans.length()>=25){
-					System.out.println(ans);
+				ans=replaceEnter(ans);
+				if(ans.length()>=100){
+					System.out.println(ans+"****");
+					showData(ans);
 					ans="";
 				}
 //				System.out.println(new String(buffer));
@@ -394,7 +474,15 @@ public class SmartPellow extends Activity {
 	    
 	    
 	}
-	
+	String replaceEnter(String str){
+		 String dest = "";  
+	        if (str != null) {  
+	            Pattern p = Pattern.compile("\\s*|\t|\r|\n");  
+	            Matcher m = p.matcher(str);  
+	            dest = m.replaceAll("");  
+	        }  
+	        return dest; 
+	}
   }
   private class TryToConnet extends Thread {
 		public void run() {
@@ -463,8 +551,8 @@ public class SmartPellow extends Activity {
       });
       layout.addView(mChartView, new LayoutParams(LayoutParams.FILL_PARENT,
           LayoutParams.FILL_PARENT));
-      boolean enabled = mDataset.getSeriesCount() > 0;
-      setSeriesWidgetsEnabled(enabled);
+//      boolean enabled = mDataset.getSeriesCount() > 0;
+//      setSeriesWidgetsEnabled(enabled);
     } else {
       mChartView.repaint();
     }
@@ -475,9 +563,9 @@ public class SmartPellow extends Activity {
    * 
    * @param enabled the enabled state
    */
-  private void setSeriesWidgetsEnabled(boolean enabled) {
-    mX.setEnabled(enabled);
-    mY.setEnabled(enabled);
-    mAdd.setEnabled(enabled);
-  }
+//  private void setSeriesWidgetsEnabled(boolean enabled) {
+//    mX.setEnabled(enabled);
+//    mY.setEnabled(enabled);
+//    mAdd.setEnabled(enabled);
+//  }
 }
