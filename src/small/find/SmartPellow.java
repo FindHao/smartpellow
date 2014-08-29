@@ -34,6 +34,7 @@ import org.achartengine.model.XYSeries;
 import org.achartengine.renderer.XYMultipleSeriesRenderer;
 import org.achartengine.renderer.XYSeriesRenderer;
 
+import android.R.string;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -80,7 +81,7 @@ public class SmartPellow extends Activity {
 	private BluetoothDevice btDevice;
 	private BluetoothSocket btSocket;
 	static OutputStream outputStream;
-	static InputStream input;
+	static InputStream inputStream;
 	private BroadcastReceiver mReceiver;
 	
 	private static final UUID MY_UUID=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -260,61 +261,81 @@ public class SmartPellow extends Activity {
     btAdapter=BluetoothAdapter.getDefaultAdapter();
 	
 	devices=new ArrayList<BluetoothDevice>(btAdapter.getBondedDevices());
+	mReceiver=new BroadcastReceiver() {
+		
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			String action=intent.getAction();
+			if(BluetoothDevice.ACTION_FOUND.equals(action)){
+				BluetoothDevice device=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+				Toast.makeText(SmartPellow.this, device.getName(), Toast.LENGTH_SHORT).show();
+				Log.i(TAG, device.getName()+device.getAddress());
+				if(device.getName().equals("HC-06"))
+//					new Thread(new Connect(device.getAddress())).start();
+					connect(device.getAddress());
+			}
+		}
+	};
+	IntentFilter intentFilter=new IntentFilter(BluetoothDevice.ACTION_FOUND);
+	registerReceiver(mReceiver, intentFilter);
+	
+	btConnectReceiver=new BroadcastReceiver() {
+		
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			Log.e(TAG, "--connected");
+			isConnect=true;
+			
+			
+			
+		}
+	};
+	connectIntentFilter=new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
+	registerReceiver(btConnectReceiver, connectIntentFilter);
+	
+	btDisconnectReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context arg0, Intent arg1) {
+			// TODO Auto-generated method stub
+			Log.e(TAG, "-- disconnected");
+			isConnect = false;
+			new TryToConnet().start();
+		}
+	};
+	
+	disconnectIntentFilter = new IntentFilter(
+			BluetoothDevice.ACTION_ACL_DISCONNECTED);
+	registerReceiver(btDisconnectReceiver, disconnectIntentFilter);
+	
 //	if(devices.size()>0){
+//		new Thread(new Connect()).start();
 //		
-//		connect(devices.get(0).getAddress());
 //		
 //	}else{
 		Toast.makeText(SmartPellow.this, "还没有配对", Toast.LENGTH_SHORT).show();
-		mReceiver=new BroadcastReceiver() {
-			
-			@Override
-			public void onReceive(Context context, Intent intent) {
-				String action=intent.getAction();
-				if(BluetoothDevice.ACTION_FOUND.equals(action)){
-					BluetoothDevice device=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-					Toast.makeText(SmartPellow.this, device.getName(), Toast.LENGTH_SHORT).show();
-					Log.i(TAG, device.getName()+device.getAddress());
-					connect(device.getAddress());
-				}
-			}
-		};
-		IntentFilter intentFilter=new IntentFilter(BluetoothDevice.ACTION_FOUND);
-		registerReceiver(mReceiver, intentFilter);
-		
-		btConnectReceiver=new BroadcastReceiver() {
-			
-			@Override
-			public void onReceive(Context context, Intent intent) {
-				Log.e(TAG, "--connected");
-				isConnect=true;
-				
-				
-				
-			}
-		};
-		connectIntentFilter=new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
-		registerReceiver(btConnectReceiver, connectIntentFilter);
-		
-		btDisconnectReceiver = new BroadcastReceiver() {
-			@Override
-			public void onReceive(Context arg0, Intent arg1) {
-				// TODO Auto-generated method stub
-				Log.e(TAG, "-- disconnected");
-				isConnect = false;
-				new TryToConnet().start();
-			}
-		};
-
-		disconnectIntentFilter = new IntentFilter(
-				BluetoothDevice.ACTION_ACL_DISCONNECTED);
-		registerReceiver(btDisconnectReceiver, disconnectIntentFilter);
 		btAdapter.startDiscovery();
 		
 //	}
     
     
     
+  }
+  private class ClientMessageReceived implements Runnable{
+	public void run() {
+
+		while(true){
+			try {
+				byte[]buffer=new byte[inputStream.available()];
+				inputStream.read(buffer);
+				Log.d(TAG, buffer+"");
+				System.out.println(buffer);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	  
   }
   private class TryToConnet extends Thread {
 		public void run() {
@@ -324,13 +345,6 @@ public class SmartPellow extends Activity {
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				Log.e(TAG, "-- failed to create btSocket");
-			}
-			try {
-				outputStream = btSocket.getOutputStream();
-				input=btSocket.getInputStream();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
 			while (true) {
 				try {
@@ -344,28 +358,88 @@ public class SmartPellow extends Activity {
 					break;
 				}
 			}
+			try {
+				outputStream = btSocket.getOutputStream();
+				inputStream=btSocket.getInputStream();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
   
   
   
-  public void connect(String address){
-		btAdapter.cancelDiscovery();
-		btDevice=btAdapter.getRemoteDevice(address);
-		
+  private class  Connect implements Runnable{
+	  	
+
+		String address;
+		public Connect(String add) {
+			// TODO Auto-generated constructor stub
+			address=add;
+		}
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+//			for(int i=0;i<devices.size();i++){
+//				if(devices.get(i).getName().equals("HC-06")){
+//					address=devices.get(i).getAddress();break;
+//				}
+//			}
+			Log.d(TAG, address);
+			btAdapter.cancelDiscovery();
+			btDevice=btAdapter.getRemoteDevice(address);
 		try {
 			btSocket=btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
-			outputStream =btSocket.getOutputStream();
 			btSocket.connect();
+			
+			outputStream =btSocket.getOutputStream();
+			inputStream=btSocket.getInputStream();
 			Toast.makeText(SmartPellow.this, "连接成功", Toast.LENGTH_LONG).show();
+//			new Thread(new ClientMessageReceived()).start();
+//			while(true){
+//				int bytes=inputStream.read();
+//				Log.d(TAG, ""+bytes);
+//			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			Toast.makeText(SmartPellow.this, "连接失败", Toast.LENGTH_LONG).show();
 			e.printStackTrace();
 		}
+		}
 	}
   
-  
+  private void connect(String address){
+	  btAdapter.cancelDiscovery();
+		btDevice=btAdapter.getRemoteDevice(address);
+		try {
+			btSocket=btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+			btSocket.connect();
+			outputStream =btSocket.getOutputStream();
+			inputStream=btSocket.getInputStream();
+			Toast.makeText(SmartPellow.this, "连接成功", Toast.LENGTH_LONG).show();
+//			new Thread(new ClientMessageReceived()).start();
+//			while(true){
+//				int bytes=inputStream.read();
+//				Log.d(TAG, ""+bytes);
+//			}
+			while(true){
+				try {
+					byte[]buffer=new byte[20];
+					inputStream.read(buffer);
+//					for(int i=0;i<100;i++)System.out.println(buffer[i]);
+					System.out.println(new String(buffer));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			Toast.makeText(SmartPellow.this, "连接失败", Toast.LENGTH_LONG).show();
+			e.printStackTrace();
+		}
+  }
   
   
   
