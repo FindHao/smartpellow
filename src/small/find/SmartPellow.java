@@ -36,7 +36,6 @@ import org.achartengine.model.XYSeries;
 import org.achartengine.renderer.XYMultipleSeriesRenderer;
 import org.achartengine.renderer.XYSeriesRenderer;
 
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -49,8 +48,10 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -79,6 +80,7 @@ public class SmartPellow extends Activity {
   //时间
   int time=0;
   private Button notice;
+  private Button naozhong;
   boolean showed=false;
   private BluetoothAdapter btAdapter;
 	private BluetoothDevice btDevice;
@@ -253,7 +255,18 @@ public class SmartPellow extends Activity {
 			
 		}
 	});
-    
+    naozhong=(Button)findViewById(R.id.naozhongbtn);
+    naozhong.setOnClickListener(new OnClickListener() {
+		public void onClick(View v) {
+			LayoutInflater inflater = getLayoutInflater();
+			   View layout = inflater.inflate(R.layout.naozhong,
+			     (ViewGroup) findViewById(R.id.dialog));
+
+			   new AlertDialog.Builder(SmartPellow.this).setTitle("闹钟").setView(layout)
+			     .setPositiveButton("确定", null)
+			     .setNegativeButton("取消", null).show();
+		}
+	});
     
     //蓝牙连接部分
     
