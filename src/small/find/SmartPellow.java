@@ -36,6 +36,7 @@ import org.achartengine.model.XYSeries;
 import org.achartengine.renderer.XYMultipleSeriesRenderer;
 import org.achartengine.renderer.XYSeriesRenderer;
 
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -126,6 +127,9 @@ public class SmartPellow extends Activity {
 	double yalicha=0;
 	boolean first=false;
 	double preyali=0;
+	
+	/**音乐播放*/
+	Alarm alarmSound;
 	
 	
   int[] colors = new int[] { Color.BLUE, Color.GREEN, Color.CYAN };
@@ -273,17 +277,22 @@ public class SmartPellow extends Activity {
 		}
 	});
     
+    alarmSound=new Alarm(SmartPellow.this);
     
+    //led灯点亮，并播放音乐
     alarm=(Button)findViewById(R.id.alarm);
     alarm.setOnClickListener(new OnClickListener() {
 		public void onClick(View v) {
 			sendMessageToALarm("L");
+			alarmSound.play();
 		}
 	});
+    //停止灯和音乐
     stopalarm=(Button)findViewById(R.id.stopalarm);
     stopalarm.setOnClickListener(new OnClickListener() {
 		public void onClick(View v) {
 			sendMessageToALarm("P");
+			alarmSound.stop();
 		}
 	});
     shake=(Button)findViewById(R.id.shake);

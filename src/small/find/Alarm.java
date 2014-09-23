@@ -2,17 +2,22 @@ package small.find;
 
 import java.io.IOException;
 
+import android.content.Context;
 import android.media.MediaPlayer;
 
 public class Alarm {
+	Context parent;
 	public MediaPlayer mMediaPlayer=null;
-	public Alarm() {
+	public Alarm(Context parent) {
 		mMediaPlayer=new MediaPlayer();
+		this.parent=parent;
 	}
 	void play(){
 		try {
-			mMediaPlayer.reset();
-			mMediaPlayer.setDataSource("a.mp3");
+			mMediaPlayer=MediaPlayer.create(parent, R.raw.qinghuaci);
+			if (mMediaPlayer != null) { 
+		        mMediaPlayer.stop();
+		       }
 			mMediaPlayer.prepare();
 			mMediaPlayer.start();
 		} catch (IllegalArgumentException e) {
