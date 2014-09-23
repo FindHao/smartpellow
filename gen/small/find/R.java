@@ -14,6 +14,7 @@ public final class R {
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
+        public static final int alarm=0x7f060009;
         public static final int chart=0x7f060005;
         public static final int dialog=0x7f060000;
         public static final int etname=0x7f060002;
@@ -21,6 +22,9 @@ public final class R {
         public static final int naozhongbtn=0x7f060008;
         public static final int new_series=0x7f060006;
         public static final int notice=0x7f060007;
+        public static final int shake=0x7f06000b;
+        public static final int stopalarm=0x7f06000a;
+        public static final int stopshake=0x7f06000c;
         public static final int tvname=0x7f060001;
         public static final int tvname2=0x7f060003;
     }
@@ -29,11 +33,15 @@ public final class R {
         public static final int xy_chart=0x7f030001;
     }
     public static final class string {
+        public static final int alarm=0x7f040005;
         public static final int app_name=0x7f040000;
         public static final int naozhong=0x7f040004;
         public static final int new_series=0x7f040001;
         public static final int notice=0x7f040002;
+        public static final int shake=0x7f040007;
         public static final int show=0x7f040003;
+        public static final int stopalarm=0x7f040006;
+        public static final int stopshake=0x7f040008;
     }
     public static final class style {
         /** 

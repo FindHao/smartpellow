@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SmartPellow</string>
+    <string name="app_name">IPillow</string>
         <string name="new_series">展示图表</string>
         <string name="notice">睡眠状况</string>
         <string name="show">欢迎使用SmartPellow～</string>
         <string name="naozhong">添加闹钟</string>
+        <string name="alarm">铃灯</string>
+        <string name="stopalarm"> 停止铃灯</string>
+        <string name="shake">震动</string>
+        <string name="stopshake">取消震动</string>
+        
 </resources>

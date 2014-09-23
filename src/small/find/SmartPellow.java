@@ -81,6 +81,12 @@ public class SmartPellow extends Activity {
   int time=0;
   private Button notice;
   private Button naozhong;
+  private Button alarm;
+  private Button stopalarm;
+  private Button shake;
+  private Button stopshake;
+  
+  
   boolean showed=false;
   private BluetoothAdapter btAdapter;
 	private BluetoothDevice btDevice;
@@ -90,7 +96,6 @@ public class SmartPellow extends Activity {
 	private BroadcastReceiver mReceiver;
 	
 	private static final UUID MY_UUID=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-//			("00001101-0000-1000-8000-98D331B3A53B");
 	//要配对的地址
 	String address="98:D3:31:B3:A5:3B";
 	private BroadcastReceiver btConnectReceiver;
@@ -174,11 +179,11 @@ public class SmartPellow extends Activity {
     mRenderer.setZoomButtonsVisible(true);
     mRenderer.setPointSize(5);
 
-    mRenderer.setXAxisMax(30);
+    mRenderer.setXAxisMax(50);
     mRenderer.setXAxisMin(0);
     mRenderer.setYAxisMin(0); 
     mRenderer.setYAxisMax(35);
-    mRenderer.setPanLimits(new double[]{0,30,0,35});
+    mRenderer.setPanLimits(new double[]{0,50,0,35});
     
     // the button that handles the new series of data creation
     mNewSeries = (Button) findViewById(R.id.new_series);
@@ -268,6 +273,33 @@ public class SmartPellow extends Activity {
 		}
 	});
     
+    
+    alarm=(Button)findViewById(R.id.alarm);
+    alarm.setOnClickListener(new OnClickListener() {
+		public void onClick(View v) {
+			sendMessageToALarm("L");
+		}
+	});
+    stopalarm=(Button)findViewById(R.id.stopalarm);
+    stopalarm.setOnClickListener(new OnClickListener() {
+		public void onClick(View v) {
+			sendMessageToALarm("P");
+		}
+	});
+    shake=(Button)findViewById(R.id.shake);
+    shake.setOnClickListener(new OnClickListener() {
+		public void onClick(View v) {
+			sendMessageToALarm("S");
+		}
+	});
+    stopshake=(Button)findViewById(R.id.stopshake);
+    stopshake.setOnClickListener(new OnClickListener() {
+		public void onClick(View v) {
+			sendMessageToALarm("H");
+		}
+	});
+    
+    
     //蓝牙连接部分
     
     btAdapter=BluetoothAdapter.getDefaultAdapter();
@@ -344,10 +376,14 @@ public class SmartPellow extends Activity {
   }
   void judge(){
 	  showNotice="";
-	  if(temperaver<40)showNotice+=DIWEN+";";
+	  if(temperaver<34)showNotice+=DIWEN+";";
 	  if(huluheavy)showNotice+=HAVEHULUHEAVY+";";
 	  else if(hulu)showNotice+=HAVEHULU+";";
-	  if(yalicha>2)showNotice+=FANGUN+";";
+	  
+	  if(yalicha>1){
+		  showNotice+=FANGUN+";";
+		  fanshen=true;
+	  }
 	  if(hulu&&fanshen)showNotice+=SLEEPSTATE1;
 	  else{
 		  if(hulu||fanshen)showNotice+=SLEEPSTATE2;
@@ -361,9 +397,11 @@ public class SmartPellow extends Activity {
 		  yalicha=Math.abs(v-preyali);
 	  }
 	  preyali=v;
+	  s/=time*10;
 	  mSound.add(time, s);
 	  if(s>20)huluheavy=true;
-	  if(s>2)hulu=true;
+	  if(s>10)hulu=true;
+	  
 	  mPressure.add(time, v);
 	  
 	  
@@ -452,7 +490,7 @@ public class SmartPellow extends Activity {
 	  sindex+=5;
 	  String t=aa.substring(sindex,sindex+3);
 	  if(showed){
-		  adddata(Double.parseDouble(t), Double.parseDouble(v), Integer.parseInt(num)/10);
+		  adddata(Double.parseDouble(t), Double.parseDouble(v), Integer.parseInt(num));
 		  numdata=Integer.parseInt(num);
 	  }
   }
@@ -497,6 +535,18 @@ public class SmartPellow extends Activity {
 	        return dest; 
 	}
   }
+  
+  /**向硬件发送消息*/
+  void sendMessageToALarm(String Message){
+	  byte[] buffer=Message.getBytes();
+	  try {
+		outputStream.write(buffer);
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+  }
+  
   private class TryToConnet extends Thread {
 		public void run() {
 			/* 此处必须重新创建一个socket，否则重新连接后无法传输数据，个人猜想是Rfcomm通道已经改变 */

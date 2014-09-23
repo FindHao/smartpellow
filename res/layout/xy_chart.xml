@@ -20,11 +20,41 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/notice" />
-<Button
-            android:id="@+id/naozhongbtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/naozhong" />
-    </LinearLayout>
+	<Button
+	            android:id="@+id/naozhongbtn"
+	            android:layout_width="wrap_content"
+	            android:layout_height="wrap_content"
+	            android:text="@string/naozhong" />
+	
+	
 
+    </LinearLayout>
+<LinearLayout android:orientation="horizontal"
+                  android:layout_width="fill_parent" android:layout_height="wrap_content">
+
+    <Button
+        android:id="@+id/alarm"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/alarm" />
+
+	<Button
+	    android:id="@+id/stopalarm"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:text="@string/stopalarm" />
+
+	<Button
+	    android:id="@+id/shake"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:text="@string/shake" />
+
+	<Button
+	    android:id="@+id/stopshake"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:text="@string/stopshake" />
+
+	    </LinearLayout>
 </LinearLayout>
